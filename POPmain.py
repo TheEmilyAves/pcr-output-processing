@@ -50,11 +50,12 @@ def whichOption(lines, response):
     code for each of these options, just different selectData functions
     """
     if response == "1":
-        selectData1(lines)
+        sublines = selectData1(lines)
     elif response == "2":
-        selectData2(lines)
+        sublines = selectData2(lines)
     else:
         print("That was an invalid option. Please enter 1 or 2 next time.")
+    return sublines
 
 
 def selectData1(lines):
@@ -307,7 +308,6 @@ def selectData2(lines):
         else:
             cycle_n.append(int(line[5]))
     max_cycle_n = max(cycle_n)
-    print(max_cycle_n)
     
     # this part is to iterate through each well/sample up to the max number
     # of wells in your file (which may or may not be 384) and retrieve
@@ -323,19 +323,28 @@ def selectData2(lines):
         header.append(well)
     # add header list to sublines
     sublines.append(header)
+    # make empty dictionary for fluorescence measurements
+    flo_dict = {}
     # iterate through wells to add fluorescence measurements
-    for well in range(1, max_well_n + 1):
+    for cycle in range(1, max_cycle_n + 1):
         for line in lines:
             # ignore lines that don't start with a valid well number (not headers)
+            # or that don't include a fifth column with cycle number
             try:
+                int(line[5])
                 int(line[0])
             except ValueError: 
                 pass
+            except TypeError: 
+                pass
+            except IndexError:
+                pass
             else:
                 # for each row matching well number in elongation phase of cycles
-                # line 0 = well, line 3 = cycle (section containing repeats), 
+                # line 5 = repeat (cycle number) 
+                # line 3 = cycle (section containing step repeated 40 times) 
                 # line 2 = temp (elongation phase at 72 degrees)
-                if eval(line[0]) == well and line[3] == "1" and float(line[2]) >= 71 and float(line[2]) <= 73:
+                if eval(line[5]) == cycle and line[3] == "1" and float(line[2]) >= 71 and float(line[2]) <= 73:
                     # if I print line here, then what I should get is 40*3 lines per well (3 lines per cycle per well)
                     # what I want to do at this point is, for each well, is calculate the average across the three or four
                     # rows for each cycle and well then store this number along with cycle number and well number
@@ -344,20 +353,48 @@ def selectData2(lines):
                     # SYBR is line[6], well number is line[0], and cycle number is line[5]
                     # that means that I need to reset the list after each well number or cycle number by well number?
                     # maybe I have to iterate through each cycle number within each well for the averages
-                    for cycle in range(1, max_cycle_n + 1):
-                        # empty list that will be filled with fluorescence measurements to be averaged per sample and cycle
-                        flo = list()
+                    
+                    for well in range(1, max_well_n + 1):
                         # for each row/line matching cycle number
                         # int(line[5]) might be an issue if it's still looking at the lines without a column 5
-                        if int(line[5]) == cycle:
-                            # add fluorescence measurement to flo list
-                            flo.append(line[6])
+                        if int(line[0]) == well:
+                            # add fluorescence measurement to flo list in flo dict
+                            # if new well,cycle combination, then make new key and then add to list
+                            key = (int(well), int(cycle))
+                            if key in flo_dict:
+                                flo_dict[key].append(float(line[6]))
+                            else:
+                                flo_dict[key] = list()
+                                flo_dict[key].append(float(line[6]))
+                            
+                            #flo_list.append(float(line[6]))
                         else:
                             pass
+                    # for each well per cycle, avg_flo is calculated
+                    #avg_flo = sum(flo) / len(flo)
+                    # for each well per cycle, avg_flo is added to row
+                    #row.append(avg_flo)
                 else:
                     pass
-    
+        # at the end of each cycle, row is added to sublines
+        #sublines.append(row)
 
+    # probably have to iterate through the dictionary separately to finish adding rows
+    # actually it makes more sense to do cycle and well again because
+    # I need to add rows by cycle
+    for cycle in range(1, max_cycle_n + 1):
+        # make empty list for row (one per cycle) that will contain cycle number
+        # followed by fluorescence measurements for each well number
+        row = list()
+        row.append(cycle)
+        for well in range(1, max_well_n + 1):
+            avg_flo = sum(flo_dict[(well,cycle)]) / len(flo_dict[(well,cycle)])
+            row.append(avg_flo)
+        sublines.append(row)
+    return sublines    
+    
+# maybe what I really need is a dictionary of lists where
+# key = tuple of well number and cycle number, value = list of fluorescence values that need to be averaged
 
 
 def getOutput(outfile_name, sublines):
@@ -370,12 +407,8 @@ def getOutput(outfile_name, sublines):
 def main():
     infile_name, outfile_name, response = getInput()
     lines = readData(infile_name)
-    whichOption(lines, response)
-    #print(well_n.__dict__)
-    #print(max_well_n)
-    #print(well_n)
-    #sublines = selectData(lines)
-    #getOutput(outfile_name, sublines)
+    sublines = whichOption(lines, response)
+    getOutput(outfile_name, sublines)
 
 if __name__ == "__main__":
     main()
