@@ -65,12 +65,13 @@ def selectData1(lines):
     
     Used well number to "call" rows of data and ignore other lines
     make new list of lists only containing the data I want:
+        -well number
         -sample label
         -reporter name
         -Ct
     """
     sublines = []
-    sublines.append(["sample_id", "gene", "Ct"])
+    sublines.append(["well", "sample", "gene", "Ct"])
     for l in lines:
         subline = []
         # this try/except loop bypasses the issue of trying to convert strings
@@ -82,6 +83,7 @@ def selectData1(lines):
         else:
             l[0] = int(l[0])
         if isinstance(l[0], int) == True:
+            subline.append(l[0])
             subline.append(l[1])
             subline.append(l[2])
             subline.append(l[5])
